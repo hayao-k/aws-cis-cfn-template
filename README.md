@@ -1,9 +1,6 @@
 # aws-cis-cfn-template
-Set up all metric filters and alarms recommended by the CIS Amazon Web Services Foundation.
+Set up all metric filters and alarms recommended by the CIS Amazon Web Services Foundation.  
 This template is a modified from AWS original version. [CloudWatch_Alarms_for_CloudTrail_API_Activity.json](https://s3-us-west-2.amazonaws.com/awscloudtrail/cloudwatch-alarms-for-cloudtrail-api-activity/CloudWatch_Alarms_for_CloudTrail_API_Activity.json)
-
-**Creating CloudWatch Alarms with an AWS CloudFormation Template**  
-https://docs.aws.amazon.com/awscloudtrail/latest/userguide/use-cloudformation-template-to-create-cloudwatch-alarms.html
 
 Added some alarm rules that are not included in the original template.
 
@@ -17,3 +14,7 @@ Following rules included in the original version are not included.
 
 * EC2InstanceChanges
 * EC2LargeInstanceChanges
+
+## Reference
+**Creating CloudWatch Alarms with an AWS CloudFormation Template**  
+https://docs.aws.amazon.com/awscloudtrail/latest/userguide/use-cloudformation-template-to-create-cloudwatch-alarms.html
