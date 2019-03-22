@@ -1,0 +1,437 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  AWS CloudTrail API Activity Alarm Template for CloudWatch Logs.
+  (Meet Monitoring Requirements of the CIS Amazon Web Services Foundations.)
+
+Parameters: 
+  LogGroupName: 
+    Type: String
+    Default: CloudTrail/DefaultLogGroup
+    Description: "Enter CloudWatch Logs log group name. Default is CloudTrail/DefaultLogGroup."
+  Email: 
+    Type: String
+    Description: Email address to notify when an API activity has triggered an alarm.
+
+Resources: 
+# 3.1 - Ensure a log metric filter and alarm exist for unauthorized API calls
+  AuthorizationFailuresMetricFilter: 
+    Type: AWS::Logs::MetricFilter
+    Properties: 
+      LogGroupName: 
+        !Ref LogGroupName
+      FilterPattern: >-
+        { ($.errorCode = "*UnauthorizedOperation") || ($.errorCode = "AccessDenied*") }
+      MetricTransformations: 
+        - MetricNamespace: CloudTrailMetrics
+          MetricName: AuthorizationFailureCount
+          MetricValue: "1"
+  AuthorizationFailuresAlarm: 
+    Type: AWS::CloudWatch::Alarm
+    Properties: 
+      AlarmName: CloudTrailAuthorizationFailures
+      AlarmDescription: Alarms when an unauthorized API call is made.
+      AlarmActions: 
+        - !Ref AlarmNotificationTopic
+      MetricName: AuthorizationFailureCount
+      Namespace: CloudTrailMetrics
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Period: 300
+      Statistic: Sum
+      Threshold: 1
+
+# 3.2 - Ensure a log metric filter and alarm exist for Management Console sign-in without MFA
+  ConsoleSigninWithoutMFAMetricFilter: 
+    Type: AWS::Logs::MetricFilter
+    Properties: 
+      LogGroupName: 
+        !Ref LogGroupName
+      FilterPattern: >-
+        { ($.eventName = "ConsoleLogin") && ($.additionalEventData.MFAUsed != "Yes") }
+      MetricTransformations: 
+        - MetricNamespace: CloudTrailMetrics
+          MetricName: ConsoleSigninWithoutMFACount
+          MetricValue: "1"
+  ConsoleSigninWithoutMFAAlarm: 
+    Type: AWS::CloudWatch::Alarm
+    Properties: 
+      AlarmName: CloudTrailConsoleSigninWithoutMFA
+      AlarmDescription: Alarms when API call is made to sign into the console without MFA.
+      AlarmActions: 
+        - !Ref AlarmNotificationTopic
+      MetricName: ConsoleSigninWithoutMFACount
+      Namespace: CloudTrailMetrics
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Period: 300
+      Statistic: Sum
+      Threshold: 1
+
+# 3.3 - Ensure a log metric filter and alarm exist for usage of "root" account
+  UseOfRootAccountMetricFilter: 
+    Type: AWS::Logs::MetricFilter
+    Properties: 
+      LogGroupName: 
+        !Ref LogGroupName
+      FilterPattern: >-
+        { $.userIdentity.type = "Root" && $.userIdentity.invokedBy NOT EXISTS && $.eventType != "AwsServiceEvent" }
+      MetricTransformations: 
+        - MetricNamespace: CloudTrailMetrics
+          MetricName: UseOfRootAccountCount
+          MetricValue: "1"
+  UseOfRootAccountAlarm: 
+    Type: "AWS::CloudWatch::Alarm"
+    Properties: 
+      AlarmName: CloudTrailUseOfRootAccount
+      AlarmDescription: Alarms when API call is made to use of root account.
+      AlarmActions: 
+        - !Ref AlarmNotificationTopic
+      MetricName: UseOfRootAccountCount
+      Namespace: CloudTrailMetrics
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Period: 300
+      Statistic: Sum
+      Threshold: 1
+
+# 3.4 - Ensure a log metric filter and alarm exist for IAM policy changes
+  IAMPolicyChangesMetricFilter: 
+    Type: AWS::Logs::MetricFilter
+    Properties: 
+      LogGroupName: 
+        !Ref LogGroupName
+      FilterPattern: >-
+        { ($.eventName=DeleteGroupPolicy) || ($.eventName=DeleteRolePolicy) ||
+        ($.eventName=DeleteUserPolicy) || ($.eventName=PutGroupPolicy) ||
+        ($.eventName=PutRolePolicy) || ($.eventName=PutUserPolicy) || 
+        ($.eventName=CreatePolicy) || ($.eventName=DeletePolicy) ||
+        ($.eventName=CreatePolicyVersion) || ($.eventName=DeletePolicyVersion) ||
+        ($.eventName=AttachRolePolicy) || ($.eventName=DetachRolePolicy) ||
+        ($.eventName=AttachUserPolicy) || ($.eventName=DetachUserPolicy) ||
+        ($.eventName=AttachGroupPolicy) || ($.eventName=DetachGroupPolicy) }
+      MetricTransformations: 
+        - MetricNamespace: CloudTrailMetrics
+          MetricName: IAMPolicyEventCount
+          MetricValue: "1"
+  IAMPolicyChangesAlarm: 
+    Type: AWS::CloudWatch::Alarm
+    Properties: 
+      AlarmName: CloudTrailIAMPolicyChanges
+      AlarmDescription: Alarms when an API call is made to change an IAM policy.
+      AlarmActions: 
+        - !Ref AlarmNotificationTopic
+      MetricName: IAMPolicyEventCount
+      Namespace: CloudTrailMetrics
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Period: 300
+      Statistic: Sum
+      Threshold: 1
+
+# 3.5 - Ensure a log metric filter and alarm exist for CloudTrail configuration changes
+  CloudTrailChangesMetricFilter: 
+    Type: AWS::Logs::MetricFilter
+    Properties: 
+      LogGroupName: 
+        !Ref LogGroupName
+      FilterPattern: >-
+        { ($.eventName = CreateTrail) || ($.eventName = UpdateTrail) ||
+        ($.eventName = DeleteTrail) || ($.eventName = StartLogging) ||
+        ($.eventName = StopLogging) }
+      MetricTransformations: 
+        - MetricNamespace: CloudTrailMetrics
+          MetricName: CloudTrailEventCount
+          MetricValue: "1"
+  CloudTrailChangesAlarm: 
+    Type: AWS::CloudWatch::Alarm
+    Properties: 
+      AlarmName: CloudTrailChanges
+      AlarmDescription: >-
+        Alarms when an API call is made to create, update or delete a CloudTrail trail,
+        or to start or stop logging to a trail.
+      AlarmActions: 
+        - !Ref AlarmNotificationTopic
+      MetricName: CloudTrailEventCount
+      Namespace: CloudTrailMetrics
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Period: 300
+      Statistic: Sum
+      Threshold: 1
+
+# 3.6 - Ensure a log metric filter and alarm exist for AWS Management Console authentication failures
+  ConsoleSignInFailuresMetricFilter: 
+    Type: AWS::Logs::MetricFilter
+    Properties: 
+      LogGroupName: 
+        !Ref LogGroupName
+      FilterPattern: >-
+        { ($.eventName = ConsoleLogin) && ($.errorMessage = "Failed authentication") }
+      MetricTransformations: 
+        - MetricNamespace: CloudTrailMetrics
+          MetricName: ConsoleSignInFailureCount
+          MetricValue: "1"
+  ConsoleSignInFailuresAlarm: 
+    Type: AWS::CloudWatch::Alarm
+    Properties: 
+      AlarmName: CloudTrailConsoleSignInFailures
+      AlarmDescription: Alarms when an unauthenticated API call is made to sign into the console.
+      AlarmActions: 
+        - !Ref AlarmNotificationTopic
+      MetricName: ConsoleSignInFailureCount
+      Namespace: CloudTrailMetrics
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Period: 300
+      Statistic: Sum
+      Threshold: 3
+
+# 3.7 - Ensure a log metric filter and alarm exist for disabling or scheduled deletion of customer created CMKs
+  DeleteOfCMKMetricFilter: 
+    Type: AWS::Logs::MetricFilter
+    Properties: 
+      LogGroupName: 
+        !Ref LogGroupName
+      FilterPattern: >-
+        { ($.eventSource = kms.amazonaws.com) && (($.eventName=DisableKey) ||
+        ($.eventName=ScheduleKeyDeletion)) }
+      MetricTransformations: 
+        - MetricNamespace: CloudTrailMetrics
+          MetricName: DeleteOfCMKCount
+          MetricValue: "1"
+  DeleteOfCMKAlarm: 
+    Type: AWS::CloudWatch::Alarm
+    Properties: 
+      AlarmName: CloudTrailDeleteOfCMK
+      AlarmDescription: >-
+        Alarms when API call is made to disabling or scheduled deletion of customer created CMK.
+      AlarmActions: 
+        - !Ref AlarmNotificationTopic
+      MetricName: DeleteOfCMKCount
+      Namespace: CloudTrailMetrics
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Period: 300
+      Statistic: Sum
+      Threshold: 1
+
+# 3.8 - Ensure a log metric filter and alarm exist for S3 bucket policy changes
+  S3BucketPolicyChangesMetricFilter: 
+    Type: AWS::Logs::MetricFilter
+    Properties: 
+      LogGroupName: 
+        !Ref LogGroupName
+      FilterPattern: >-
+        { ($.eventSource = s3.amazonaws.com) && (($.eventName = PutBucketAcl) ||
+        ($.eventName = PutBucketPolicy) || ($.eventName = PutBucketCors) ||
+        ($.eventName = PutBucketLifecycle) || ($.eventName = PutBucketReplication) ||
+        ($.eventName = DeleteBucketPolicy) || ($.eventName = DeleteBucketCors) ||
+        ($.eventName = DeleteBucketLifecycle) || ($.eventName = DeleteBucketReplication)) }
+      MetricTransformations: 
+        - MetricNamespace: CloudTrailMetrics
+          MetricName: S3BucketPolicyChangesCount
+          MetricValue: "1"
+  S3BucketPolicyChangesAlarm: 
+    Type: AWS::CloudWatch::Alarm
+    Properties: 
+      AlarmName: CloudTrailS3BucketPolicyChanges
+      AlarmDescription: Alarms when API call is made to S3 bucket policy changes.
+      AlarmActions: 
+        - !Ref AlarmNotificationTopic
+      MetricName: S3BucketPolicyChangesCount
+      Namespace: CloudTrailMetrics
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Period: 300
+      Statistic: Sum
+      Threshold: 1
+
+# 3.9 - Ensure a log metric filter and alarm exist for AWS Config configuration changes
+  AWSConfigChangesMetricFilter: 
+    Type: AWS::Logs::MetricFilter
+    Properties: 
+      LogGroupName: 
+        !Ref LogGroupName
+      FilterPattern: >-
+        { ($.eventSource = config.amazonaws.com) && (($.eventName=StopConfigurationRecorder) ||
+        ($.eventName=DeleteDeliveryChannel) || ($.eventName=PutDeliveryChannel) ||
+        ($.eventName=PutConfigurationRecorder)) }
+      MetricTransformations: 
+        - MetricNamespace: CloudTrailMetrics
+          MetricName: AWSConfigChangesCount
+          MetricValue: "1"
+  AWSConfigChangesAlarm: 
+    Type: AWS::CloudWatch::Alarm
+    Properties: 
+      AlarmName: CloudTrailAWSConfigChanges
+      AlarmDescription: Alarms when API call is made to AWS Config configuration changes.
+      AlarmActions: 
+        - !Ref AlarmNotificationTopic
+      MetricName: AWSConfigChangesCount
+      Namespace: CloudTrailMetrics
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Period: 300
+      Statistic: Sum
+      Threshold: 1
+
+# 3.10 - Ensure a log metric filter and alarm exist for security group changes
+  SecurityGroupChangesMetricFilter: 
+    Type: AWS::Logs::MetricFilter
+    Properties:   
+      LogGroupName: 
+        !Ref LogGroupName
+      FilterPattern: >-
+        { ($.eventName = AuthorizeSecurityGroupIngress) || ($.eventName = AuthorizeSecurityGroupEgress) ||
+        ($.eventName = RevokeSecurityGroupIngress) || ($.eventName = RevokeSecurityGroupEgress) ||
+        ($.eventName = CreateSecurityGroup) || ($.eventName = DeleteSecurityGroup) }
+      MetricTransformations: 
+        - MetricNamespace: CloudTrailMetrics
+          MetricName: SecurityGroupEventCount
+          MetricValue: "1"
+  SecurityGroupChangesAlarm: 
+    Type: AWS::CloudWatch::Alarm
+    Properties: 
+      AlarmName: CloudTrailSecurityGroupChanges
+      AlarmDescription: Alarms when an API call is made to create, update or delete a Security Group.
+      AlarmActions: 
+        - !Ref AlarmNotificationTopic
+      MetricName: SecurityGroupEventCount
+      Namespace: CloudTrailMetrics
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Period: 300
+      Statistic: Sum
+      Threshold: 1
+
+# 3.11 - Ensure a log metric filter and alarm exist for changes to Network Access Control Lists (NACL)
+  NetworkAclChangesMetricFilter: 
+    Type: AWS::Logs::MetricFilter
+    Properties: 
+      LogGroupName: 
+        !Ref LogGroupName
+      FilterPattern: >-
+        { ($.eventName = CreateNetworkAcl) || ($.eventName = CreateNetworkAclEntry) ||
+        ($.eventName = DeleteNetworkAcl) || ($.eventName = DeleteNetworkAclEntry) || 
+        ($.eventName = ReplaceNetworkAclEntry) || ($.eventName = ReplaceNetworkAclAssociation) }
+      MetricTransformations: 
+        - MetricNamespace: CloudTrailMetrics
+          MetricName: NetworkAclEventCount
+          MetricValue: "1"
+  NetworkAclChangesAlarm: 
+    Type: AWS::CloudWatch::Alarm
+    Properties: 
+      AlarmName: CloudTrailNetworkAclChanges
+      AlarmDescription: Alarms when an API call is made to create, update or delete a Network ACL.
+      AlarmActions: 
+        - !Ref AlarmNotificationTopic
+      MetricName: NetworkAclEventCount
+      Namespace: CloudTrailMetrics
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Period: 300
+      Statistic: Sum
+      Threshold: 1
+
+# 3.12 - Ensure a log metric filter and alarm exist for changes to network gateways
+  GatewayChangesMetricFilter: 
+    Type: AWS::Logs::MetricFilter
+    Properties: 
+      LogGroupName: 
+        !Ref LogGroupName
+      FilterPattern: >-
+        { ($.eventName = CreateCustomerGateway) || ($.eventName = DeleteCustomerGateway) ||
+        ($.eventName = AttachInternetGateway) || ($.eventName = CreateInternetGateway) ||
+        ($.eventName = DeleteInternetGateway) || ($.eventName = DetachInternetGateway) }
+      MetricTransformations: 
+        - MetricNamespace: CloudTrailMetrics
+          MetricName: GatewayEventCount
+          MetricValue: "1"
+  GatewayChangesAlarm: 
+    Type: AWS::CloudWatch::Alarm
+    Properties: 
+      AlarmName: CloudTrailGatewayChanges
+      AlarmDescription: >-
+        Alarms when an API call is made to create, update or delete a Customer or Internet Gateway.
+      AlarmActions: 
+        - !Ref AlarmNotificationTopic
+      MetricName: GatewayEventCount
+      Namespace: CloudTrailMetrics
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Period: 300
+      Statistic: Sum
+      Threshold: 1
+
+# 3.13 - Ensure a log metric filter and alarm exist for route table changes
+  RootTableChangesMetricFilter: 
+    Type: AWS::Logs::MetricFilter
+    Properties: 
+      LogGroupName: 
+        !Ref LogGroupName
+      FilterPattern: >-
+        { ($.eventName = CreateRoute) || ($.eventName = CreateRouteTable) ||
+        ($.eventName = ReplaceRoute) || ($.eventName = ReplaceRouteTableAssociation) ||
+        ($.eventName = DeleteRouteTable) || ($.eventName = DeleteRoute) ||
+        ($.eventName = DisassociateRouteTable) }
+      MetricTransformations: 
+        - MetricNamespace: CloudTrailMetrics
+          MetricName: RootTableChangesCount
+          MetricValue: "1"
+  RootTableChangesAlarm: 
+    Type: AWS::CloudWatch::Alarm
+    Properties: 
+      AlarmName: CloudTrailRootTableChanges
+      AlarmDescription: Alarms when an API call is made to route table changes.
+      AlarmActions: 
+        - !Ref AlarmNotificationTopic
+      MetricName: RootTableChangesCount
+      Namespace: CloudTrailMetrics
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Period: 300
+      Statistic: Sum
+      Threshold: 1
+
+# 3.14 - Ensure a log metric filter and alarm exist for VPC changes
+  VpcChangesMetricFilter: 
+    Type: AWS::Logs::MetricFilter
+    Properties: 
+      LogGroupName: 
+        !Ref LogGroupName
+      FilterPattern: >-
+        { ($.eventName = CreateVpc) || ($.eventName = DeleteVpc) ||
+        ($.eventName = ModifyVpcAttribute) || ($.eventName = AcceptVpcPeeringConnection) ||
+        ($.eventName = CreateVpcPeeringConnection) || ($.eventName = DeleteVpcPeeringConnection) ||
+        ($.eventName = RejectVpcPeeringConnection) || ($.eventName = AttachClassicLinkVpc) ||
+        ($.eventName = DetachClassicLinkVpc) || ($.eventName = DisableVpcClassicLink) ||
+        ($.eventName = EnableVpcClassicLink) }
+      MetricTransformations: 
+        - MetricNamespace: CloudTrailMetrics
+          MetricName: VpcEventCount
+          MetricValue: "1"
+  VpcChangesAlarm: 
+    Type: AWS::CloudWatch::Alarm
+    Properties: 
+      AlarmName: CloudTrailVpcChanges
+      AlarmDescription: >-
+        Alarms when an API call is made to create, update or delete a VPC,
+        VPC peering connection or VPC connection to classic.
+      AlarmActions: 
+        - !Ref AlarmNotificationTopic
+      MetricName: VpcEventCount
+      Namespace: CloudTrailMetrics
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Period: 300
+      Statistic: Sum
+      Threshold: 1
+
+# Create SNS Topic
+  AlarmNotificationTopic: 
+    Type: AWS::SNS::Topic
+    Properties: 
+      Subscription: 
+        - Endpoint: 
+            !Ref Email
+          Protocol: email
