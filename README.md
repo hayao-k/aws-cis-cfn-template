@@ -9,6 +9,7 @@ Added some alarm rules that are not included in the original template.
 * 3,7 - Ensure a log metric filter and alarm exist for disabling or scheduled deletion of customer created CMKs
 * 3.8 - Ensure a log metric filter and alarm exist for S3 bucket policy changes
 * 3.9 - Ensure a log metric filter and alarm exist for AWS Config configuration changes
+* 3.13 - Ensure a log metric filter and alarm exist for route table changes
 
 Following rules included in the original version are not included.
 
